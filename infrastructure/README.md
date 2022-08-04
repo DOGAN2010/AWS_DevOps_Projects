@@ -1767,9 +1767,9 @@ ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${WORKSPACE}/
 - Prepare static inventory file with name of `hosts.ini` for Ansible under `ansible/inventory` folder using Docker machines private IP addresses.
 
 ```ini
-172.31.91.243   ansible_user=ubuntu  
-172.31.87.143   ansible_user=ubuntu
-172.31.90.30    ansible_user=ubuntu
+172.31.37.10   ansible_user=ubuntu  
+172.31.39.237   ansible_user=ubuntu
+172.31.46.14    ansible_user=ubuntu
 ```
 
 - Commit the change, then push to the remote repo.
