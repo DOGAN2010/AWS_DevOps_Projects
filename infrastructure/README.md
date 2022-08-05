@@ -2291,9 +2291,9 @@ kompose convert -f docker-compose.yml -o petclinic_chart/templates
         command: ['sh', '-c', 'until nc -z config-server:8888; do echo waiting for config-server; sleep 2; done;']
 # for all other microservices except config-server, discovery-server and mysql-server
       initContainers:
-      - name: init-discovery-server
-        image: busybox
-        command: ['sh', '-c', 'until nc -z discovery-server:8761; do echo waiting for discovery-server; sleep 2; done;']
+        - name: init-discovery-server
+          image: busybox
+          command: ['sh', '-c', 'until nc -z discovery-server:8761; do echo waiting for discovery-server; sleep 2; done;']
 ``` 
 
 * Update `spec.rules.host` field of `api-gateway-ingress.yaml` file and add `ingressClassName: nginx` field under the `spec` field as below.
@@ -2372,7 +2372,7 @@ AWS_REGION=us-east-1 helm repo add stable-petclinicapp s3://petclinic-helm-chart
 * Update `version` and `appVersion` field of `k8s/petclinic_chart/Chart.yaml` file as below for testing.
 
 ```yaml
-version: 1.1.1
+version: 0.0.1
 appVersion: 0.1.0
 ```
 
@@ -2386,7 +2386,7 @@ helm package petclinic_chart/
 * Store the local package in the Amazon S3 Helm repository.
 
 ```bash
-HELM_S3_MODE=3 AWS_REGION=us-east-1 helm s3 push ./petclinic_chart-1.1.1.tgz stable-petclinicapp
+HELM_S3_MODE=3 AWS_REGION=us-east-1 helm s3 push ./petclinic_chart-0.0.1.tgz stable-petclinicapp
 ```
 
 * Search for the Helm chart.
@@ -2411,7 +2411,7 @@ helm package petclinic_chart/
 * Push the new version to the Helm repository in Amazon S3.
 
 ```bash
-HELM_S3_MODE=3 AWS_REGION=us-east-1 helm s3 push ./petclinic_chart-1.1.2.tgz stable-petclinicapp
+HELM_S3_MODE=3 AWS_REGION=us-east-1 helm s3 push ./petclinic_chart-0.0.2.tgz stable-petclinicapp
 ```
 
 * Verify the updated Helm chart.
