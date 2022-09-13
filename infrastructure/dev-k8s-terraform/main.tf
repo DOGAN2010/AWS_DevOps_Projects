@@ -8,10 +8,12 @@ module "iam" {
 
 resource "aws_security_group" "matt-kube-mutual-sg" {
   name = "kube-mutual-sec-group-for-matt"
+  vpc_id = "vpc-0767a2e230a0a0e6e"
 }
 
 resource "aws_security_group" "matt-kube-worker-sg" {
   name = "kube-worker-sec-group-for-matt"
+  vpc_id = "vpc-0767a2e230a0a0e6e"
   ingress {
     protocol = "tcp"
     from_port = 10250
@@ -53,6 +55,7 @@ resource "aws_security_group" "matt-kube-worker-sg" {
 
 resource "aws_security_group" "matt-kube-master-sg" {
   name = "kube-master-sec-group-for-matt"
+  vpc_id = "vpc-0767a2e230a0a0e6e"
 
   ingress {
     protocol = "tcp"
