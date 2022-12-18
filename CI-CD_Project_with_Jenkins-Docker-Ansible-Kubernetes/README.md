@@ -56,7 +56,7 @@ echo "Hello World!"
 - Now we can run our Second job to check `Github integration` is working as expected. Create another FreeStyleJob as below:
 ```sh
 SCM: Git
-URL: https://github.com/DOGAN2010/hello-world.git
+URL: https://github.com/DOGAN2010/CI-CD_Project_with_Jenkins-Docker-Ansible-Kubernetes.git
 Save -> Build Now
 ```
 
@@ -123,15 +123,15 @@ amazon-linux-extras install java-openjdk11
 - Next we will install Tomcat, switch to `/opt` directory 
 
 ```sh
-wget https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.68/bin/apache-tomcat-9.0.68.tar.gz
-tar -xvzf apache-tomcat-9.0.68.tar.gz
-mv apache-tomcat-9.0.68.tar.gz tomcat
+wget https://dlcdn.apache.org/tomcat/tomcat-10/v10.0.27/bin/apache-tomcat-10.0.27.tar.gz
+tar -xvzf apache-tomcat-10.0.27.tar.gz
+mv apache-tomcat-10.0.27.tar.gz tomcat
 ```
 - Now we can start our Tomcat server
 
 ```sh
-cd tomcat/bin/
-./startup.sh
+cd tomcat/
+sudo bin/startup.sh
 ```
 - Now we should be able to access our Tomcat server from browser. Go to `http:<public_ip_of_your_tomcat_server>:8080`
 
@@ -202,7 +202,7 @@ pwd: deployer
 - Now we can create our next job with name of `BuildAndDeployJob`. After build step, the artifact will stored under `webapp/target/` directory as `webapp.war`.  
 ```sh
 Kind: Maven Project
-SCM: https://github.com/DOGAN2010/hello-world.git
+SCM: https://github.com/DOGAN2010/CI-CD_Project_with_Jenkins-Docker-Ansible-Kubernetes.git
 Goal and options: clean install
 Post Build Actions: Deploy war/ear to a container
 WAR/EAR files: **/*.war
@@ -346,7 +346,7 @@ provide password
 ```sh
 Name: BuildAndDeployOnContainer
 Type: Maven Project
-SCM: https://github.com/DOGAN2010/hello-world.git
+SCM: https://github.com/DOGAN2010/CI-CD_Project_with_Jenkins-Docker-Ansible-Kubernetes.git
 POLL SCM: * * * * *
 Build Goals: clean install
 Post build actions: Send build artifacts over ssh
