@@ -126,12 +126,17 @@ amazon-linux-extras install java-openjdk11
 wget https://dlcdn.apache.org/tomcat/tomcat-10/v10.0.27/bin/apache-tomcat-10.0.27.tar.gz
 tar -xvzf apache-tomcat-10.0.27.tar.gz
 mv apache-tomcat-10.0.27.tar.gz tomcat
+
+
+wget https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.70/bin/apache-tomcat-9.0.70.tar.gz
+tar -xvzf apache-tomcat-9.0.70.tar.gz
+mv apache-tomcat-9.0.70 tomcat
 ```
 - Now we can start our Tomcat server
 
 ```sh
-cd tomcat/
-sudo bin/startup.sh
+cd tomcat/bin
+./startup.sh
 ```
 - Now we should be able to access our Tomcat server from browser. Go to `http:<public_ip_of_your_tomcat_server>:8080`
 
