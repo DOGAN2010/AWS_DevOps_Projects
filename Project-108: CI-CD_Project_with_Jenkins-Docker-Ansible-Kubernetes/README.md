@@ -70,7 +70,7 @@ Save -> Build Now
 cd /opt
 sudo wget https://dlcdn.apache.org/maven/maven-3/3.8.6/binaries/apache-maven-3.8.6-bin.tar.gz 
 sudo tar -xvzf apache-maven-3.8.6-bin.tar.gz 
-mv apache-maven-3.8.6-bin maven
+mv apache-maven-3.8.6 maven
 ```
 
 - Next configure `M2_HOME` and `M2`(binary directory) environment variables and add them to the `PATH` so that we can run `maven` commands in any directory. You can search where is your JVM by using t`find / name java-11*`
@@ -123,11 +123,6 @@ amazon-linux-extras install java-openjdk11
 - Next we will install Tomcat, switch to `/opt` directory 
 
 ```sh
-wget https://dlcdn.apache.org/tomcat/tomcat-10/v10.0.27/bin/apache-tomcat-10.0.27.tar.gz
-tar -xvzf apache-tomcat-10.0.27.tar.gz
-mv apache-tomcat-10.0.27.tar.gz tomcat
-
-
 wget https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.70/bin/apache-tomcat-9.0.70.tar.gz
 tar -xvzf apache-tomcat-9.0.70.tar.gz
 mv apache-tomcat-9.0.70 tomcat
@@ -200,8 +195,10 @@ cd tomcat/bin/
 - Configure Tomcat Server with credentials. Go to `Manage Jenkins` -> `Manage Credentials`. We will select `Add credentials`. We will use the credential we have added to `tomcat-user.xml` file for this step. Since these credentials will be used for deploying app, we will add `deployer` credentials which has `manager-script` role.
 ```sh
 Kind: username with password
-username: deployer
-pwd: deployer
+username : deployer
+Password : deployer
+id       :  `Tomcat_user`
+Description: `Tomcat user to deploy on tomcat server`
 ```
 
 - Now we can create our next job with name of `BuildAndDeployJob`. After build step, the artifact will stored under `webapp/target/` directory as `webapp.war`.  
@@ -221,12 +218,17 @@ Tomcat URL: http://<Public_IP_of_Tomcat_server>:8080/
 ![](app-v1-deployed-to-tomcat.png)
 ### Step3: Automate Build and Deploy using Poll SCM
 
-- We can configure our job to be triggered with `Poll SCM` by scheduling a cron job. It will check the repository based on given schedule. If there is any change in repository, it will trigger job and deployed the new version of app to Tomcat server.
+Now job is running fine but to make this as Continuous Integration and Continuous Deployment Tod do that go back and modify job as below.  It will check the repository based on given schedule. If there is any change in repository, it will trigger job and deployed the new version of app to Tomcat server.
 
-- We can also configure a webhook in our repository, whenever there is any `Git push` happens, job will trigger. To be able to setup Webhooks in Github, Go to `Settings` -> `Webhook` -> `Add webhook` 
-```sh
+  - Build Triggers
+    - Poll SCM
+      - schedule `*/2 * * * *`
+Save the job and modify the code in GitHub. 
+ We can also configure a webhook in our repository, whenever there is any `Git push` happens, job will trigger. To be able to setup Webhooks in Github, Go to `Settings` -> `Webhook` -> `Add webhook` 
+
 Payload URL: http://<dns_of_your_jenkins_server>:8080/github-webhook/
-``` 
+Then you could see your job get trigger a build without any manual intervention.
+
 
 ## Integrating Docker in CI/CD Pipeline
 
@@ -515,27 +517,40 @@ ansible all -m ping
 
 - Go to Jenkins server, `Manage jenkins` -> `Configure System`. We need to add below information under `Publish over SSH`:
 ```sh
+SSH Server
 Name: ansible-server
 Hostname: Private-ip-of-Ansible-server
 username: ansadmin
+click Advanced
+click Use password authentication, or use a different key
 Enable user authentication
-password
+Passphrase / Password : enter ansadmin password
+click Test Configuration
+see success
 ```
 
-- Now we can create our Jenkins job:
-```sh
-Name: CopyArtifactsOntoAnsible
-Copy from: BuildAndDeployOnContainer
-Post build actions: ansiblehost
-delete exec commands
-```
-- Go to ansible server, we need to create `/opt/docker` directory and give ownership to `ansadmin`
+- Go to ansible server, we need to create `/opt/docker` directory in root and give ownership to `ansadmin`
 ```sh
 cd /opt
 mkdir docker
 chown -R ansadmin:ansadmin docker
+- Now we can create our Jenkins job:
+```sh
+Name: CopyArtifactsOntoAnsible
+select maven project
+Source Code Management:git
+Repository URL:https://github.com/DOGAN2010/hello-world.git
+Branch Specifier (blank for 'any'):main or master
+build:
+Root POM:pom.xml
+Goals and options:clean install
+Post build actions: Send build artifacts over ssh
+SSH server: ansible-server
+TransferSet: webapp/target/*.war  or  **/*.war
+Remove prefix: webapp/target
+Remote directory: /opt/docker
+save
 ```
-
 - Save and build the job. `webapp.war` file is successfully copied to ansible server.
 
 ### Step4: Build an Image and create container on Ansible
@@ -549,7 +564,14 @@ systemctl start docker
 systemctl enable docker
 systemctl status docker
 ```
+```
+/opt/docker
+vim Dockefile
 
+FROM tomcat:latest
+RUN cp -R /usr/local/tomcat/webapps.dist/* /usr/local/tomcat/webapps/
+COPY ./*.war /usr/local/tomcat/webapps
+```
 - We will create same Dockerfile under `docker` directory in Ansible host.
 We can create image and run container from this image in `ansible` server.
 ```sh
@@ -566,7 +588,7 @@ docker run -t --name regapp-server -p 8081:8080 regapp:v1
   
   tasks:
     - name: create docker image
-      command: docker build -t regapp:latest .
+      shell: docker build -t regapp:latest .
       args:
         chdir: /opt/docker
 ```
@@ -612,14 +634,14 @@ docker push dogan2010/regapp:tagname
   
   tasks:
     - name: create docker image
-      command: docker build -t regapp:latest .
+      shell: docker build -t regapp:latest .
       args:
         chdir: /opt/docker
     - name: create tag to push image onto dockerhub
-      command: docker tag regapp:latest dogan2010/regapp:latest
+      shell: docker tag regapp:latest dogan2010/regapp:latest
 
     - name: push docker image
-      command: docker push dogan2010/regapp:latest
+      shell: docker push dogan2010/regapp:latest
 ```
 
 - We can dry-run our playbook by giving `--check` flag.
@@ -629,14 +651,125 @@ ansible-playbook regapp.yml --check
 
 ### Step7: Jenkins job to build an image
 
-- We will configure CopyArtifactOntoAnsible job to deploy image with ansible playbook
+### Part-01 : Create an docker image 
+    
+1. Login to Jenkins console
+1. Create *Jenkins job*, Fill the following details,
+   - *Source Code Management:*
+      - Repository : `https://github.com/DOGAN2010/hello-world.git`
+      - Branches to build : `*/master`  
+   - *Build:*
+     - Root POM:`pom.xml`
+     - Goals and options : `clean install package`
+   - *Post Steps*
+     - *Send files or execute commands over SSH*
+       - Name: `ansible_server`
+       - Source files	: `webapp/target/*.war`
+       - Remove prefix	: `webapp/target`
+       - Remote directory	: `//opt//docker`
 
-```sh
+     - *Send files or execute commands over SSH*
+       - Name: `ansible_server`
+       - Source files	: `Dockerfile`
+       - Remote directory	: `//opt//docker`
+       - Exec Command: 
+	      - `cd /opt/docker`
+          - `docker build -t dogan2010/regapp:latest .`
+	        - `docker tag regapp:latest dogan2010/regapp:latest`
+          - `docker push dogan2010/regapp:latest`
+          - `docker rmi regapp:latest dogan2010/regapp:latest`
+              
+1. Login to Docker host and check images and containers. (no images and containers)
 
-under SSH server:
-host: ansiblehost
-exec command: ansible-playbook /opt/docker/regapp.yml
-```
+1. login to docker hub and check. shouldn't find images with for valaxy_demo 
+
+1. Execute Jenkins job
+
+1. check images in Docker hub. Now you could able to see new images pushed to Valaxy Docker_Hub
+
+#### Troubleshooting:
+1. Docker should be installed on ansible server 
+1. Should login to "docker hub" on ansible server
+1. ansadmin user should be part of `docker` group
+
+In *Part-02* we create *create_docker_container.yml* playbook. this get intiated by jenkins job, run by ansible and exected on dokcer_host
+
+### Part-02 : Deploy Containers
+
+1. Write a yml file to create a container (file name : create_docker_container.yml)
+   ```yaml
+---
+- hosts: web-servers
+  become: true
+  tasks:
+   - name: stop previous version docker
+     shell: docker stop regapp_demo
+   - name: remove stopped container
+     shell: docker rm -f regapp_demo	  
+   - name: remove docker images
+     shell: docker image rm -f dogan2010/regapp:latest
+          
+   - name: create docker image
+     shell: docker run -d --name regapp_demo -p 8090:8080 dogan2010/regapp:latest
+
+1. Add this script to Jenkins job.
+   - Chose *"configure"* to modify your jenkins job. 
+     - *Under post build actions*
+        - Send files or execute commands over SSH
+          - Exec Command: 
+          ```sh
+             cd /opt/playbooks
+             ansible-playbook create_docker_container.yml
+            ```
+          
+1. Execute Jenkins job. 
+
+1. You could see a new container on your docker host. can able access it from browser on port 8090
+
+Troubleshooting: 
+Makesure you have opened required ports on AWS Security group for this server. 
+
+In *Part-03* we try to improvise to store docker images previous versions
+
+### Part-03 : Deploy with Version Control Containers 
+
+So for we used latest docker image to build a container, but what happens if latest version is not working?  
+One easiest solution is, maintaining version for each build. This can be achieved by using environment variables. 
+
+here we use 2 variables 
+- `BUILD_ID` -  The current build id
+- `JOB_NAME` - Name of the project of this build. This is the name you gave your job when you first set it up.
+
+for more info Please refer [this URL](https://wiki.jenkins.io/display/JENKINS/Building+a+software+project)
+
+Lets modify jenkins job which was created in *Part-01* as below.
+
+1. Create Jenkins job 
+   - *Source Code Management:*
+      - Repository : `https://github.com/DOGAN2010/hello-world.git`
+      - Branches to build : `*/master`  
+   - *Build:*
+     - Root POM:`pom.xml`
+     - Goals and options : `clean install package`
+ 
+   - *Send files or execute commands over SSH*
+     - Name: `ansible_server`
+     - Source files	: `webapp/target/*.war`
+     - Remove prefix	: `webapp/target`
+     - Remote directory	: `//opt//docker`
+
+   - *Send files or execute commands over SSH*
+     - Name: `ansible_server`
+     - Source files	: `Dockerfile`
+     - Remote directory	: `//opt//docker`
+      	- `cd /opt/docker`
+        - `docker build -t $JOB_NAME:v1.$BUILD_ID .`
+        - `docker tag $JOB_NAME:v1.$BUILD_ID dogan2010/$JOB_NAME:v1.$BUILD_ID`
+        - `docker tag $JOB_NAME:v1.$BUILD_ID dogan2010/$JOB_NAME:latest`
+        - `docker push dogan2010/$JOB_NAME:v1.$BUILD_ID`
+        - `docker push dogan2010/$JOB_NAME:latest`
+        - `docker rmi $JOB_NAME:v1.$BUILD_ID dogan2010/$JOB_NAME:v1.$BUILD_ID` 
+        - `dogan2010/$JOB_NAME:latest`
 ### Step8: Create container on dockerhost using ansible playbook
 
 - We can create another playbook, which can run container from the image that we pushed to our public repository on dockerhub.
@@ -647,7 +780,7 @@ exec command: ansible-playbook /opt/docker/regapp.yml
 
   tasks:
     - name: create container
-      command: docker run -d --name regapp-server -p 8082:8080 dogan2010/regapp:latest 
+      shell: docker run -d --name regapp-server -p 8082:8080 dogan2010/regapp:latest 
 ```
 
 - But we have a problem in this playbook, when we try to run the same playbook again, it will give an error saying `regapp-server container already exists.` To fix this problem, we will add below tasks to our playbook.
@@ -664,19 +797,19 @@ exec command: ansible-playbook /opt/docker/regapp.yml
 
   tasks:
     - name: stop existing container
-      command: docker stop regapp-server
+      shell: docker stop regapp-server
       ignore_errors: yes
 
     - name: remove the container
-      command: docker rm regapp-server
+      shell: docker rm regapp-server
       ignore_errors: yes
 
     - name: remove the existing image
-      command: docker rmi dogan2010/regapp:latest
+      shell: docker rmi dogan2010/regapp:latest
       ignore_errors: yes
 
     - name: create container
-      command: docker run -d --name regapp-server -p 8082:8080 dogan2010/regapp:latest 
+      shell: docker run -d --name regapp-server -p 8082:8080 dogan2010/regapp:latest 
       ignore_errors: yes
 ```
 
@@ -704,7 +837,7 @@ ansible-playbook /opt/docker/regapp-deploy.yml
 ```sh
 eksctl create cluster --name rd-cluster \
 --region us-east-1 \
---node-type t2.small 
+--node-type t3a.medium 
 ```
 - To delete cluster, run below command:
 ```sh
@@ -854,7 +987,7 @@ ansible -a uptime all
 
   tasks:
     - name: deploy regapp on kubernetes
-      command: kubectl apply -f regapp-deployment.yml
+      shell: kubectl apply -f regapp-deployment.yml
 ```
 
 - Next we will create our `kube_service.yml` playbook in ansible server.
@@ -865,7 +998,7 @@ ansible -a uptime all
 
   tasks:
   - name: deploy regapp on kubernetes
-    command: kubectl apply -f regapp-service.yml
+    shell: kubectl apply -f regapp-service.yml
 ```
 
 - Since we are running these files as root user we need to copy ssh public key uder home directory of root user for ansible to control. For this action, It will ask root user password. we can easily configure a password for rrot with `passwd root` command in kubernetes bootstrap server.
@@ -908,10 +1041,10 @@ kubectl delete service dogan-service
 
   tasks:
     - name: deploy regapp on kubernetes
-      command: kubectl apply -f regapp-deployment.yml
+      shell: kubectl apply -f regapp-deployment.yml
 
     - name: create loadbalancer service on kubernetes
-      command: kubectl apply -f regapp-service.yml
+      shell: kubectl apply -f regapp-service.yml
 ```
 
 ### Step5: CI Job to create Image for Kubernetes
@@ -932,7 +1065,7 @@ Initialize only when build is stable
 - We need to update one more thing in our `kube-deploy.yml` playbook. We need to specify the rollout whenever if new image is pushed to docker hub.
 ```yaml
   - name: update deployment with new pods if image updated in docker hub
-    command: kubectl rollout restart deployment.apps/dogan-regapp
+    shell: kubectl rollout restart deployment.apps/dogan-regapp
 ```
 - We can make an update to `index.jsp` in our `hello-world project` under `hello-world/webapp/src/main/webapp/` directory and push our changes to Github. This will trigger both CI&CD jobs triggered successively. 
 
