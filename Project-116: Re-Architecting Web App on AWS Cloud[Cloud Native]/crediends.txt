@@ -1,0 +1,24 @@
+ynBYAqZ4KLafQrdOezKs
+admin
+
+Master username
+admin
+Master password
+ynBYAqZ4KLafQrdOezKs
+
+
+
+Username
+rabbit
+
+Password
+dogan12345krc6789
+
+b-e7c96b47-18c7-4580-8875-d7d82b67ddd6.mq.us-east-1.amazonaws.com
+
+Endpoint
+vprofile-rds-mysql.cxqw9zaxqpje.us-east-1.rds.amazonaws.com
+
+
+
+elasticache-svc.yow55u.0001.use1.cache.amazonaws.com:11211
