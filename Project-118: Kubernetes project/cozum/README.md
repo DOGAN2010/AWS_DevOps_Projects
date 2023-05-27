@@ -158,6 +158,9 @@ $ kubectl port-forward deployment/wp-deployment -n production 8080:80
 
 ```
 $ kubectl apply -f ./yaml/wpingress.yaml
+
+$ kubectl get ingress -A -w
+
 ```
 
 </details>
@@ -180,6 +183,8 @@ $ kubectl apply -f ./yaml/deployment.yaml
 
 ```
 $ kubectl expose deployment k8s-deployment --type=LoadBalancer -n production
+
+$ kubectl get svc
 ```
 
 </details>
@@ -190,6 +195,8 @@ $ kubectl expose deployment k8s-deployment --type=LoadBalancer -n production
   <summary>Çözümü görmek için tıklayınız!</summary>
 
 ```
+$ kubectl get pods -n production -w
+
 $ kubectl scale deployment k8s-deployment --replicas=3 -n production
 
 $ kubectl scale deployment k8s-deployment --replicas=10 -n production
@@ -270,6 +277,8 @@ $ nodedrain=$(kubectl get no -o jsonpath="{.items[3].metadata.name}")
 $ kubectl drain $nodedrain --ignore-daemonsets --delete-local-data
 
 $ kubectl cordon $nodedrain
+
+$ kubectl uncordon $nodedrain # Tekrar schedule edilmesini sağlamak için bu kod girilir.
 
 ```
 
