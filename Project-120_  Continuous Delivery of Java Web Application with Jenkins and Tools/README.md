@@ -1,7 +1,5 @@
 # Project-7: Continuous Delivery with Jenkins and Tools
 
-[*Project Source*](https://www.udemy.com/course/devopsprojects/?src=sac&kw=devops+projects)
-
 ## Pre-requisities:
 
 * AWS Account
@@ -388,33 +386,45 @@ description: nexuslogin
 
 - We will create Jenkinsfile for Build pipeline as below. The variables mentioned in pom.xml repository part and settings.xml will be declared in Jenkinsfile with their values to be used during execution. Update Pipeline file and push to GitHub.
 ```sh
+
 pipeline {
-    agent any
+    
+	agent any
+
+
+
     tools {
         maven "MAVEN3"
         jdk "OracleJDK8"
     }
-
     environment {
         SNAP_REPO = 'vprofile-snapshot'
-        NEXUS_USER = '<user_name>'
-        NEXUS_PASS = '<password>'
+        NEXUS_USER = 'admin'
+        NEXUS_PASS = '123'
         RELEASE_REPO = 'vprofile-release'
         CENTRAL_REPO = 'vpro-maven-central'
-        NEXUSIP = '172.31.10.139'
+        NEXUSIP = '172.31.0.140'
         NEXUSPORT = '8081'
         NEXUS_GRP_REPO = 'vpro-maven-group'
         NEXUS_LOGIN = 'nexuslogin'
+        ARTVERSION = "${env.BUILD_ID}"
+        SONARSERVER = 'sonarserver'
+        SONARSCANNER = 'sonarscanner'
     }
 
-    stages {
-        stage('Build') {
+    stages{
+        
+        stage('BUILD'){
             steps {
-                sh 'mvn -s settings.xml -DskipTests install'
+                sh 'mvn clean install -DskipTests'
+            }
+            post {
+                success {
+                    echo 'Now Archiving...'
+                    archiveArtifacts artifacts: '**/target/*.war'
+                }
             }
         }
-    }
-}
 ```
 
 - We will create a New Job in Jenkins with below properties:
@@ -456,27 +466,25 @@ Build Trigger: GitHub hook trigger for GITScm polling
 
 - We can add a post action to our pipeline script and commit/push changes to GitHub.
 ```sh
-stage('Build') {
+	    stage('UNIT TEST'){
             steps {
-                sh 'mvn -s settings.xml -DskipTests install'
+                sh 'mvn test'
+            }
+        }
+	    stage('INTEGRATION TEST'){
+            steps {
+                sh 'mvn verify -DskipUnitTests'
+            }
+        }
+        
+        stage ('CODE ANALYSIS WITH CHECKSTYLE'){
+            steps {
+                sh 'mvn checkstyle:checkstyle'
             }
             post {
                 success {
-                    echo "Now Archiving."
-                    archiveArtifacts artifacts: '**/*.war'
+                    echo 'Generated Analysis Result'
                 }
-            }
-        }
-
-stage('Test') {
-           steps {
-            sh 'mvn test'
-           }
-        }
-        
-        stage('Checkstyle Analysis'){
-            steps {
-                sh 'mvn -s settings.xml checkstyle:checkstyle'
             }
         }
 ```
@@ -520,25 +528,25 @@ SONARSERVER = 'sonarserver'
 SONARSCANNER = 'sonarscanner'
 
 ##new stages to be added##
- stage('CODE ANALYSIS with SONARQUBE') {
+        stage('CODE ANALYSIS with SONARQUBE') {
           
-          environment {
-             scannerHome = tool "${SONARSCANNER}"
-          }
-
-          steps {
-            withSonarQubeEnv("${SONARSERVER}") {
-               sh '''${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=vprofile \
-                   -Dsonar.projectName=vprofile-repo \
-                   -Dsonar.projectVersion=1.0 \
-                   -Dsonar.sources=src/ \
-                   -Dsonar.java.binaries=target/test-classes/com/visualpathit/account/controllerTest/ \
-                   -Dsonar.junit.reportsPath=target/surefire-reports/ \
-                   -Dsonar.jacoco.reportsPath=target/jacoco.exec \
-                   -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml'''
+            environment {
+                scannerHome = tool "${SONARSCANNER}"
             }
+            steps {
+                withSonarQubeEnv("${SONARSERVER}") {
+                sh '''${scannerHome}/bin/sonar-scanner -Dsonar.projectKey=vprofile \
+                    -Dsonar.projectName=vprofile-repo \
+                    -Dsonar.projectVersion=1.0 \
+                    -Dsonar.sources=src/ \
+                    -Dsonar.java.binaries=target/test-classes/com/visualpathit/account/controllerTest/ \
+                    -Dsonar.junit.reportsPath=target/surefire-reports/ \
+                    -Dsonar.jacoco.reportsPath=target/jacoco.exec \
+                    -Dsonar.java.checkstyle.reportPaths=target/checkstyle-result.xml'''
+                }
 
-          }
+            }
+        }
 ```
 
 - Our job is completed succesfully.
@@ -553,13 +561,14 @@ http://<private_ip_of_jenkins>:8080/sonarqube-webhook
 
 - We will add below stage to our pipeline and commit changes to Github.
 ```sh
- stage('QUALITY GATE') {
+
+        stage('QUALITY GATE') {
             steps {
-                timeout(time: 10, unit: 'MINUTES') {
-               waitForQualityGate abortPipeline: true
-            }
-            }
-}
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }    
+        }
 ```
 
 - We can see BUILD is successful!
@@ -575,25 +584,25 @@ yy-MM-dd_HHmm
 
 - We will add below stage to our pipeline and see results.
 ```sh
-stage('UPLOAD ARTIFACT') {
-                steps {
-                    nexusArtifactUploader(
-                        nexusVersion: 'nexus3',
-                        protocol: 'http',
-                        nexusUrl: "${NEXUSIP}:${NEXUSPORT}",
-                        groupId: 'QA',
-                        version: "${env.BUILD_ID}-${env.BUILD_TIMESTAMP}",
-                        repository: "${RELEASE_REPO}",
-                        credentialsId: ${NEXUS_LOGIN},
-                        artifacts: [
-                            [artifactId: 'vproapp' ,
-                            classifier: '',
-                            file: 'target/vprofile-v2.war',
-                            type: 'war']
-                        ]
-                    )
-                }
-        }
+        stage('UPLOAD ARTIFACT') {
+            steps {
+                nexusArtifactUploader(
+                    nexusVersion: 'nexus3',
+                    protocol: 'http',
+                    nexusUrl: "${NEXUSIP}:${NEXUSPORT}",
+                    groupId: 'QA',
+                    version: "${env.BUILD_ID}-${env.BUILD_TIMESTAMP}",
+                    repository: "${RELEASE_REPO}",
+                    credentialsId: "${NEXUS_LOGIN}",
+                    artifacts: [
+                        [artifactId: 'vproapp',
+                        classifier: '',
+                        file: 'target/vprofile-v2.war',
+                        type: 'war']
+                    ]
+                )
+            }    
+        } 
 ```
 
 - Build is successful.
@@ -623,14 +632,14 @@ description: slacktoken
 
 - We will add below part to our Jenkinsfile in the same level with stages and push our changes.
 ```sh
-post{
+    post{
         always {
             echo 'Slack Notifications'
-            slackSend channel: '#jenkinscicd',
+            slackSend channel: '#ci-cd-jenkins',
                 color: COLOR_MAP[currentBuild.currentResult],
                 message: "*${currentBuild.currentResult}:* Job ${env.JOB_NAME} build ${env.BUILD_NUMBER} \n More info at: ${env.BUILD_URL}"
         }
-    }
+    }  
 ```
 - We get our Notification from slack.
 
@@ -698,27 +707,27 @@ systemctl restart jenkins
 - We will add below env variables and stages to the `Jenkinsfile` under `StagePipeline` directory.
 ```sh
 #### 3 new environment variables ####
-         registryCredential = 'ecr:us-east-1:awscreds'
-        appRegistry = '392530415763.dkr.ecr.us-east-1.amazonaws.com/vprofileappimg'
-        vprofileRegistry = "https://392530415763.dkr.ecr.us-east-1.amazonaws.com"
+        registryCredential = 'ecr:us-east-1:awscred'
+        appRegistry = "434207267281.dkr.ecr.us-east-1.amazonaws.com/vprofileappimg" 
+        vprofileRegistry = "https://434207267281.dkr.ecr.us-east-1.amazonaws.com"
 ################################
-    stage('Build App image'){
-            steps{
-                script{
-                  dockerImage = docker.build( appRegistry + ":$BUILD_NUMBER", "./Docker-files/app/multistage/")
+        stage('Build App Image') {
+            steps {
+                script {
+                    dockerImage = docker.build( appRegistry + ":$BUILD_NUMBER", "./Docker-files/app/multistage/")
                 }
             }
         }
-
-        stage('Upload App Image'){
-            steps{
-                script{
-                    docker.withRegistry( vprofileRegistry, registryCredential ) {
-                        dockerImage.push("$BUILD_NUMBER")
-                        dockerImage.push('latest')
-                    }
-                }
+        
+        stage('Upload App Image') {
+          steps{
+            script {
+              docker.withRegistry( vprofileRegistry, registryCredential ) {
+                dockerImage.push("$BUILD_NUMBER")
+                dockerImage.push('latest')
+              }
             }
+          }
         }
 ```
 - Then commit/push changes to our GitHub repository.
@@ -785,12 +794,12 @@ Grace period: 30
 cluster = "vprostaging"
 service = "vproappstagesvc"
 ########################
-stage('Deploy to ECS Staging') {
-                steps {
-                    withAWS(credentials: 'awscreds', region: 'us-east-1') {
-                        sh 'aws ecs update-service --cluster ${cluster} --service ${service} --force-new-deploymnet'
-                    }
-                }
+        stage('Deploy to ECS staging') {
+            steps {
+                withAWS(credentials: 'awscreds', region: 'us-east-1') {
+                    sh 'aws ecs update-service --cluster ${cluster} --service ${service} --force-new-deployment'
+                } 
+            }
         }
 ```
 - Our pipeline is complete.
@@ -837,35 +846,38 @@ git checkout -b prod
 - Then we will create new `Jenkinsfile` under `ProdPipeline` directory. Commit/push to GitHub.
 ```sh
 def COLOR_MAP = [
-    'SUCCESS' : 'good',
-    'FAILURE' : 'danger'
+    'SUCCESS': 'GOOD',
+    'FAILURE': 'danger',
 ]
 
 pipeline {
-    agent any
+    
+	agent any
 
     environment {
-        cluster = "vproprod"
+        cluster = "vproappprod"
         service = "vproappprodsvc"
+
     }
+	
     stages{
-        stage('Deploy to ECS Staging') {
-                    steps {
-                        withAWS(credentials: 'awscreds', region: 'us-east-1') {
-                            sh 'aws ecs update-service --cluster ${cluster} --service ${service} --force-new-deployment'
-                        }
-                    }
+        stage('Deploy to ECS Prod') {
+            steps {
+                withAWS(credentials: 'awscreds', region: 'us-east-1') {
+                    sh 'aws ecs update-service --cluster ${cluster} --service ${service} --force-new-deployment'
+                } 
             }
         }
-
+    }
     post{
         always {
             echo 'Slack Notifications'
-            slackSend channel: '#jenkinscicd',
+            slackSend channel: '#prod-jenkins',
                 color: COLOR_MAP[currentBuild.currentResult],
                 message: "*${currentBuild.currentResult}:* Job ${env.JOB_NAME} build ${env.BUILD_NUMBER} \n More info at: ${env.BUILD_URL}"
         }
-    }
+    }               
+
 }
 ```
 
