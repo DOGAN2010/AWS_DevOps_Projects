@@ -732,7 +732,8 @@ systemctl restart jenkins
 ```
 - Then commit/push changes to our GitHub repository.
 
-- Next we will create a new pipeline in Jenkins.
+- Next we w
+- ill create a new pipeline in Jenkins.
 ```sh
 Name: vprofile-cicd-pipeline-docker
 Type: Pipeline
